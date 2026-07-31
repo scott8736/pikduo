@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'pikduo_worldcups_v2'
+const STORAGE_KEY = 'pikduo_worldcups'
 const API_KEY_STORAGE = 'gemini_api_key'
 
 const DEFAULT_WORLDCUPS = [
@@ -27,11 +27,18 @@ function safeParseGeminiText(rawText) {
 export default function App() {
   const path = window.location.pathname
   const [worldcups, setWorldcups] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WORLDCUPS } catch { return DEFAULT_WORLDCUPS }
+    try { 
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) { const p = JSON.parse(saved); if (p.length > 0) return p }
+      const old = localStorage.getItem('pikduo_worldcups_v2')
+      if (old) { const p2 = JSON.parse(old); if (p2.length > 0) return p2 }
+      return DEFAULT_WORLDCUPS
+    } catch { return DEFAULT_WORLDCUPS }
   })
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) || "")
   const [generating, setGenerating] = useState(false)
-  const [prompt, setPrompt] = useState("2026년 7월 한국 핫 트렌드 이상형 월드컵 10개 만들어줘. 후보 16명씩")
+  const [genCount, setGenCount] = useState(3)
+  const [prompt, setPrompt] = useState("2026년 7월 한국 핫 트렌드 이상형 월드컵")
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(worldcups)) }, [worldcups])
   useEffect(() => { localStorage.setItem(API_KEY_STORAGE, apiKey) }, [apiKey])
@@ -41,6 +48,7 @@ export default function App() {
       if (!apiKey) { alert("Gemini API 키를 입력하세요"); return }
       setGenerating(true)
       try {
+        const MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash-latest", "gemini-1.5-flash"]
         const systemPrompt = `
 너는 이상형 월드컵 데이터 생성기야.
 반드시 아래 JSON 배열 형식으로만 답해. 설명, 마크다운, 인사 절대 금지. JSON 배열만.
@@ -53,56 +61,43 @@ export default function App() {
   }
 ]
 
-요청: ${prompt}
+요청: ${prompt} ${genCount}개 만들어줘. 후보 16명씩
 규칙:
-- 10개 생성
+- ${genCount}개 생성
 - 각 월드컵 title에 '이상형 월드컵' 포함
 - candidates는 16개 문자열 배열
 - category는 아이돌/연예인/음식/여행/스포츠/기타 중 하나
 - 반드시 JSON 배열만 출력
 `
-        // FIX: 모델명을 최신으로 변경 - gemini-1.5-flash -> gemini-2.0-flash / gemini-1.5-flash-latest
-        const MODEL = "gemini-2.0-flash"
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }],
-          })
-        })
-        const data = await res.json()
-        if (!res.ok) {
-          // 2.0 실패시 1.5로 재시도
-          if (data.error?.message?.includes("not found")) {
-            const retry = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+        let lastError = null
+        let successList = null
+
+        for (const MODEL of MODELS_TO_TRY) {
+          try {
+            console.log(`Trying model: ${MODEL}`)
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
             })
-            const retryData = await retry.json()
-            if (!retry.ok) throw new Error(retryData.error?.message || "API 호출 실패")
-            const rawRetry = retryData.candidates?.[0]?.content?.parts?.[0]?.text
-            if (!rawRetry) throw new Error("Gemini 응답이 비어있음")
-            const listRetry = safeParseGeminiText(rawRetry)
-            const newWorldcupsRetry = listRetry.map((w, idx) => ({
-              id: (w.title || `worldcup-${idx}`).toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-") + "-" + Date.now().toString(36) + idx,
-              title: w.title, category: w.category || "기타", views: Math.floor(Math.random()*50000)+1000,
-              candidates: (w.candidates || []).map((c, i) => {
-                const name = typeof c === 'string' ? c : (c.name || "")
-                return { id: i, name, image: `https://picsum.photos/seed/${encodeURIComponent(name)}/400/400` }
-              }).filter(c=>c.name)
-            }))
-            setWorldcups(prev => [...newWorldcupsRetry, ...prev])
-            alert(`${newWorldcupsRetry.length}개 생성 성공! (fallback 모델)`)
-            return
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error?.message || `Model ${MODEL} failed`)
+            const raw = data.candidates?.[0]?.content?.parts?.[0]?.text
+            if (!raw) throw new Error("Empty response")
+            console.log(`Model ${MODEL} raw:`, raw)
+            const list = safeParseGeminiText(raw)
+            successList = list
+            break
+          } catch (e) {
+            console.warn(`Model ${MODEL} failed:`, e.message)
+            lastError = e
+            continue
           }
-          throw new Error(data.error?.message || "API 호출 실패")
         }
-        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text
-        if (!raw) throw new Error("Gemini 응답이 비어있음")
-        console.log("Gemini 원문:", raw)
-        const list = safeParseGeminiText(raw)
-        const newWorldcups = list.map((w, idx) => ({
+
+        if (!successList) throw lastError || new Error("모든 모델 실패")
+
+        const newWorldcups = successList.map((w, idx) => ({
           id: (w.title || `worldcup-${idx}`).toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-") + "-" + Date.now().toString(36) + idx,
           title: w.title, category: w.category || "기타", views: Math.floor(Math.random()*50000)+1000,
           candidates: (w.candidates || []).map((c, i) => {
@@ -110,6 +105,7 @@ export default function App() {
             return { id: i, name, image: `https://picsum.photos/seed/${encodeURIComponent(name)}/400/400` }
           }).filter(c=>c.name)
         }))
+
         setWorldcups(prev => [...newWorldcups, ...prev])
         alert(`${newWorldcups.length}개 생성 성공!`)
       } catch (e) {
@@ -126,12 +122,22 @@ export default function App() {
           <h1 className="text-3xl font-black mb-2">PikDuo 관리자</h1>
           <p className="text-gray-500 mb-6"><a href="/" className="underline">← 홈으로</a> | 전체 {worldcups.length}개</p>
           <div className="bg-white rounded-2xl p-6 shadow mb-8">
-            <h2 className="font-bold mb-3">🧠 Gemini API 연동 - 매일 트렌드 자동 생성 (v2.0 모델 적용)</h2>
+            <h2 className="font-bold mb-3">🧠 Gemini API 연동 - 자동 생성 (2026 최신 모델)</h2>
             <input value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="AIzaSy..." className="w-full border rounded-lg px-4 py-2 mb-3" />
-            <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3} className="w-full border rounded-lg px-4 py-2 mb-3" />
+            <div className="flex gap-3 mb-3">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500">생성 개수</label>
+                <input type="number" min="1" max="20" value={genCount} onChange={e=>setGenCount(parseInt(e.target.value)||1)} className="w-full border rounded-lg px-4 py-2" />
+              </div>
+              <div className="flex-[3]">
+                <label className="text-xs text-gray-500">프롬프트</label>
+                <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={2} className="w-full border rounded-lg px-4 py-2" />
+              </div>
+            </div>
             <button onClick={handleGenerate} disabled={generating} className="bg-black text-white px-6 py-2 rounded-full font-bold disabled:opacity-50">
-              {generating ? "생성중... 20초 걸림" : "10개 자동 생성"}
+              {generating ? `생성중... ${genCount}개 20초 걸림` : `${genCount}개 자동 생성`}
             </button>
+            <p className="text-xs text-gray-400 mt-2">모델 자동 fallback: 2.5-flash → 1.5-flash-latest 순으로 시도</p>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow">
             <h3 className="font-bold mb-4">월드컵 관리</h3>
