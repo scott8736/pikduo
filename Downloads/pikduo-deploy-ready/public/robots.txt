@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://pikduo.pages.dev/sitemap.xml
