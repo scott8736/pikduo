@@ -3,29 +3,80 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>이상형 월드컵 - PIKDUO | 당신의 최애를 골라보세요</title>
-    <meta name="description" content="아이돌, 연예인, 음식, 여행까지! 수천개의 이상형 월드컵을 즐기고 직접 만들어보세요. 매일 업데이트되는 핫 트렌드 월드컵." />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Primary SEO -->
+    <title>이상형 월드컵 - 매일 업데이트되는 한국 트렌드 월드컵 모음 | PikDuo</title>
+    <meta name="description" content="가장 핫한 이상형 월드컵을 매일 업데이트! 여자아이돌, 남자배우, 음식, MBTI 등 100개 이상 월드컵을 무료로 즐기세요. 직접 만드는 나만의 이상형 월드컵도 가능!" />
+    <meta name="keywords" content="이상형 월드컵, 이상형 월드컵 만들기, 여자아이돌 이상형 월드컵, 남자배우 이상형 월드컵, 음식 이상형 월드컵, PikDuo, 픽듀오, 월드컵 게임" />
+    <meta name="author" content="PikDuo" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://pickone.testmbti.net/" />
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PikDuo" />
+    <meta property="og:title" content="이상형 월드컵 - 매일 업데이트되는 트렌드 월드컵" />
+    <meta property="og:description" content="여자아이돌부터 음식까지! 지금 가장 핫한 이상형 월드컵 100개 무료로 즐기기" />
+    <meta property="og:url" content="https://pickone.testmbti.net/" />
+    <meta property="og:image" content="https://pickone.testmbti.net/og-image.png" />
+    <meta property="og:locale" content="ko_KR" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="이상형 월드컵 모음 - PikDuo" />
+    <meta name="twitter:description" content="매일 업데이트되는 인기 이상형 월드컵" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8646375689901020" crossorigin="anonymous"></script>
+    
+    <!-- Google Analytics (GA4) placeholder - replace G-XXXX -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXX"></script>
     <script>
-      tailwind.config = { darkMode: 'class' }
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXX');
     </script>
-    <meta name="google-adsense-account" content="ca-pub-XXXXXXXX">
+
+    <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "name": "PIKDUO 이상형 월드컵",
-      "url": "https://pikduo.pages.dev",
+      "name": "PikDuo - 이상형 월드컵",
+      "url": "https://pickone.testmbti.net/",
+      "description": "매일 업데이트되는 한국 트렌드 이상형 월드컵",
+      "inLanguage": "ko-KR",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://pikduo.pages.dev/search?q={search_term_string}",
+        "target": "https://pickone.testmbti.net/search?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "인기 이상형 월드컵",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "여자아이돌 이상형 월드컵", "url": "https://pickone.testmbti.net/w/female-idol-2025" },
+        { "@type": "ListItem", "position": 2, "name": "국민 라면 이상형 월드컵", "url": "https://pickone.testmbti.net/w/ramen" },
+        { "@type": "ListItem", "position": 3, "name": "남자배우 이상형 월드컵", "url": "https://pickone.testmbti.net/w/male-actor" }
+      ]
+    }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+      body { font-family: 'Pretendard', -apple-system, sans-serif; }
+    </style>
   </head>
-  <body class="bg-[#fafaf9] dark:bg-[#111] text-zinc-900 dark:text-zinc-100">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
