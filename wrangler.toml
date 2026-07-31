@@ -1,0 +1,21 @@
+
+name = "pikduo"
+compatibility_date = "2026-07-31"
+pages_build_output_dir = "dist"
+
+[triggers]
+crons = ["0 0 * * *"]
+
+# R2 - 이미지 저장용 (대시보드에서 생성 후 연결)
+# [[r2_buckets]]
+# binding = "IMAGES"
+# bucket_name = "pikduo-images"
+
+# D1 - DB (선택, 지금은 localStorage 버전)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "pikduo-db"
+# database_id = "xxxx-xxxx"
+
+[vars]
+GEMINI_MODEL = "gemini-1.5-flash"
