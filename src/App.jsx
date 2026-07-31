@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'pikduo_worldcups'
+const STORAGE_KEY = 'pikduo_worldcups_v2'
 const API_KEY_STORAGE = 'gemini_api_key'
 
 const DEFAULT_WORLDCUPS = [
-  { id: 'female-idol-2025', title: '2025 최애 여자아이돌 이상형 월드컵', category: '아이돌', views: 124833, candidates: ["장원영","카리나","윈터","사나","제니","로제","지수","미나","모모","쯔위","아이유","태연","카즈하","설윤","리즈","레이"].map((n,i)=>({id:i, name:n, image:`https://picsum.photos/seed/${n}/400/400`})) },
-  { id: 'ramen', title: '국민 라면 이상형 월드컵', category: '음식', views: 89322, candidates: ["신라면","진라면","불닭볶음면","짜파게티","너구리","안성탕면","삼양라면","육개장","참깨라면","열라면","오뚜기라면","팔도비빔면","진짬뽕","틈새라면","무파마","간짬뽕"].map((n,i)=>({id:i, name:n, image:`https://picsum.photos/seed/${n}/400/400`})) },
-  { id: 'male-actor', title: '최애 남자배우 이상형 월드컵', category: '연예인', views: 76543, candidates: ["박보검","차은우","송강","정해인","박서준","현빈","공유","이동욱","남주혁","로운","김수현","이종석","지창욱","안보현","변우석","강태오"].map((n,i)=>({id:i, name:n, image:`https://picsum.photos/seed/${n}/400/400`})) },
+  { id: 'female-idol-2025', title: '2025 최애 여자아이돌 이상형 월드컵', category: '아이돌', views: 124833, candidates: ["장원영","카리나","윈터","사나","제니","로제","지수","미나","모모","쯔위","아이유","태연","카즈하","설윤","리즈","레이"].map((n,i)=>({id:i, name:n, image:`https://picsum.photos/seed/${encodeURIComponent(n)}-idol/400/400`})) },
+  { id: 'ramen', title: '국민 라면 이상형 월드컵', category: '음식', views: 89322, candidates: ["신라면","진라면","불닭볶음면","짜파게티","너구리","안성탕면","삼양라면","육개장","참깨라면","열라면","오뚜기라면","팔도비빔면","진짬뽕","틈새라면","무파마","간짬뽕"].map((n,i)=>({id:i, name:n, image:`https://picsum.photos/seed/${encodeURIComponent(n)}-ramen/400/400`})) },
+  { id: 'male-actor', title: '최애 남자배우 이상형 월드컵', category: '연예인', views: 76543, candidates: ["박보검","차은우","송강","정해인","박서준","현빈","공유","이동욱","남주혁","로운","김수현","이종석","지창욱","안보현","변우석","강태오"].map((n,i)=>({id:i, name:n, image:`https://picsum.photos/seed/${encodeURIComponent(n)}-actor/400/400`})) },
 ]
 
 function safeParseGeminiText(rawText) {
@@ -19,7 +19,6 @@ function safeParseGeminiText(rawText) {
   if (Array.isArray(parsed.items)) return parsed.items
   if (parsed.worldcup) return [parsed.worldcup]
   if (parsed.title) return [parsed]
-  // 객체 안에 월드컵들이 키값으로 있는 경우
   const vals = Object.values(parsed).filter(v => v && typeof v === 'object' && v.title)
   if (vals.length > 0) return vals
   throw new Error("배열을 찾을 수 없음: " + JSON.stringify(parsed).slice(0,200))
@@ -37,7 +36,6 @@ export default function App() {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(worldcups)) }, [worldcups])
   useEffect(() => { localStorage.setItem(API_KEY_STORAGE, apiKey) }, [apiKey])
 
-  // 관리자 페이지
   if (path.startsWith('/admin')) {
     const handleGenerate = async () => {
       if (!apiKey) { alert("Gemini API 키를 입력하세요"); return }
@@ -63,38 +61,60 @@ export default function App() {
 - category는 아이돌/연예인/음식/여행/스포츠/기타 중 하나
 - 반드시 JSON 배열만 출력
 `
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // FIX: 모델명을 최신으로 변경 - gemini-1.5-flash -> gemini-2.0-flash / gemini-1.5-flash-latest
+        const MODEL = "gemini-2.0-flash"
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: systemPrompt }] }],
-            generationConfig: { temperature: 0.9 }
           })
         })
         const data = await res.json()
-        if (!res.ok) throw new Error(data.error?.message || "API 호출 실패")
+        if (!res.ok) {
+          // 2.0 실패시 1.5로 재시도
+          if (data.error?.message?.includes("not found")) {
+            const retry = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+            })
+            const retryData = await retry.json()
+            if (!retry.ok) throw new Error(retryData.error?.message || "API 호출 실패")
+            const rawRetry = retryData.candidates?.[0]?.content?.parts?.[0]?.text
+            if (!rawRetry) throw new Error("Gemini 응답이 비어있음")
+            const listRetry = safeParseGeminiText(rawRetry)
+            const newWorldcupsRetry = listRetry.map((w, idx) => ({
+              id: (w.title || `worldcup-${idx}`).toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-") + "-" + Date.now().toString(36) + idx,
+              title: w.title, category: w.category || "기타", views: Math.floor(Math.random()*50000)+1000,
+              candidates: (w.candidates || []).map((c, i) => {
+                const name = typeof c === 'string' ? c : (c.name || "")
+                return { id: i, name, image: `https://picsum.photos/seed/${encodeURIComponent(name)}/400/400` }
+              }).filter(c=>c.name)
+            }))
+            setWorldcups(prev => [...newWorldcupsRetry, ...prev])
+            alert(`${newWorldcupsRetry.length}개 생성 성공! (fallback 모델)`)
+            return
+          }
+          throw new Error(data.error?.message || "API 호출 실패")
+        }
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text
         if (!raw) throw new Error("Gemini 응답이 비어있음")
-        
         console.log("Gemini 원문:", raw)
         const list = safeParseGeminiText(raw)
-
         const newWorldcups = list.map((w, idx) => ({
           id: (w.title || `worldcup-${idx}`).toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-") + "-" + Date.now().toString(36) + idx,
-          title: w.title,
-          category: w.category || "기타",
-          views: Math.floor(Math.random()*50000)+1000,
+          title: w.title, category: w.category || "기타", views: Math.floor(Math.random()*50000)+1000,
           candidates: (w.candidates || []).map((c, i) => {
-            const name = typeof c === 'string' ? c : (c.name || c.title || "")
-            return { id: i, name, image: typeof c === 'string' ? `https://picsum.photos/seed/${encodeURIComponent(name)}/400/400` : (c.image || `https://picsum.photos/seed/${encodeURIComponent(name)}/400/400`) }
+            const name = typeof c === 'string' ? c : (c.name || "")
+            return { id: i, name, image: `https://picsum.photos/seed/${encodeURIComponent(name)}/400/400` }
           }).filter(c=>c.name)
         }))
-
         setWorldcups(prev => [...newWorldcups, ...prev])
         alert(`${newWorldcups.length}개 생성 성공!`)
       } catch (e) {
         console.error(e)
-        alert("생성 실패: " + e.message + "\n\nF12 콘솔을 확인하세요")
+        alert("생성 실패: " + e.message)
       } finally {
         setGenerating(false)
       }
@@ -105,17 +125,14 @@ export default function App() {
         <div className="max-w-5xl mx-auto">
           <h1 className="text-3xl font-black mb-2">PikDuo 관리자</h1>
           <p className="text-gray-500 mb-6"><a href="/" className="underline">← 홈으로</a> | 전체 {worldcups.length}개</p>
-          
           <div className="bg-white rounded-2xl p-6 shadow mb-8">
-            <h2 className="font-bold mb-3">🧠 Gemini API 연동 - 매일 트렌드 자동 생성</h2>
+            <h2 className="font-bold mb-3">🧠 Gemini API 연동 - 매일 트렌드 자동 생성 (v2.0 모델 적용)</h2>
             <input value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="AIzaSy..." className="w-full border rounded-lg px-4 py-2 mb-3" />
             <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3} className="w-full border rounded-lg px-4 py-2 mb-3" />
             <button onClick={handleGenerate} disabled={generating} className="bg-black text-white px-6 py-2 rounded-full font-bold disabled:opacity-50">
               {generating ? "생성중... 20초 걸림" : "10개 자동 생성"}
             </button>
-            <p className="text-xs text-gray-400 mt-3">팁: JSON.parse(...).map 에러는 이제 safeParseGeminiText가 자동으로 고쳐줍니다. 콘솔에 원문을 찍어줘요.</p>
           </div>
-
           <div className="bg-white rounded-2xl p-6 shadow">
             <h3 className="font-bold mb-4">월드컵 관리</h3>
             {worldcups.map(w => (
@@ -130,7 +147,6 @@ export default function App() {
     )
   }
 
-  // 월드컵 플레이 페이지 /w/:id
   if (path.startsWith('/w/')) {
     const id = path.split('/w/')[1]
     const wc = worldcups.find(w=>w.id===id) || worldcups[0]
@@ -139,7 +155,6 @@ export default function App() {
     const [nextRound, setNextRound] = useState([])
     const [pair, setPair] = useState([0,1])
     const [winner, setWinner] = useState(null)
-
     const choose = (idx) => {
       const chosen = round[pair[idx]]
       const newNext = [...nextRound, chosen]
@@ -149,7 +164,6 @@ export default function App() {
         setRound(newNext); setNextRound([]); setPair([0,1])
       } else { setNextRound(newNext); setPair(newPair) }
     }
-
     if (winner) return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#f7f5f2] p-6">
         <h1 className="text-2xl font-black mb-4">🏆 최종 우승</h1>
@@ -158,7 +172,6 @@ export default function App() {
         <a href="/" className="bg-black text-white px-8 py-3 rounded-full">다른 월드컵 하기</a>
       </div>
     )
-
     return (
       <div className="min-h-screen bg-[#f7f5f2] flex flex-col">
         <div className="text-center py-6"><a href="/" className="font-black text-xl">PikDuo</a><div className="text-sm text-gray-500">{wc.title} · {round.length}강</div></div>
@@ -173,7 +186,6 @@ export default function App() {
     )
   }
 
-  // 홈
   return (
     <div className="min-h-screen bg-[#f7f5f2]">
       <header className="max-w-6xl mx-auto flex justify-between items-center p-6">
